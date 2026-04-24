@@ -1,0 +1,21 @@
+node_modules/
+dist/
+
+# Variáveis de ambiente (NUNCA commitar)
+.env
+
+# Sessão WhatsApp (contém credenciais)
+auth_info_baileys/
+
+# Banco de dados local (memória do agente)
+data/memory.db
+data/memory.db-shm
+data/memory.db-wal
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
