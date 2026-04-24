@@ -30,4 +30,4 @@ export const config = {
     baseConhecimento: 'data/base-conhecimento',
     bancoDados: 'data/memoria.db',
   },
-} as const;
+};

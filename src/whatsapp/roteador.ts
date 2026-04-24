@@ -3,7 +3,8 @@ import { config } from '../config';
 import { handleChatParticular } from './handlers/particular';
 import { handleMencaoGrupo, handleRespostaGestor, agenteFoiMencionado } from './handlers/grupo';
 import { handleTreinamento } from './handlers/treinamento';
-import { obterJidDoAgente } from './cliente';
+import { enviarMensagem, obterJidDoAgente } from './cliente';
+import { atualizarEnv } from '../utils/env-writer';
 
 function extrairTexto(msg: proto.IWebMessageInfo): string | null {
   const m = msg.message;
@@ -19,16 +20,51 @@ function ehGrupo(jid: string): boolean {
   return jid.endsWith('@g.us');
 }
 
-function formatarTelefone(jid: string): string {
-  return jid.split(':')[0].split('@')[0];
-}
-
 export async function roteadorMensagens(msg: proto.IWebMessageInfo): Promise<void> {
   const jid = msg.key.remoteJid;
   if (!jid) return;
 
   const texto = extrairTexto(msg)?.trim();
   if (!texto) return;
+
+  // ── Comandos de setup (funcionam em QUALQUER grupo) ──────────────────────
+  if (ehGrupo(jid)) {
+    if (texto === '!id') {
+      await enviarMensagem(jid, `🆔 *ID deste grupo:*\n\`${jid}\`\n\nCopie este ID e cole no arquivo \`.env\`.`);
+      return;
+    }
+
+    if (texto === '!configurar treinamento') {
+      atualizarEnv('ID_GRUPO_TREINAMENTO', jid);
+      config.whatsapp.idGrupoTreinamento = jid;
+      await enviarMensagem(
+        jid,
+        `✅ *Grupo de Treinamento configurado!*\n\n` +
+        `A partir de agora eu aprendo tudo que você me ensinar aqui.\n\n` +
+        `📋 *Comandos disponíveis neste grupo:*\n` +
+        `• !ajuda — ver todos os comandos\n` +
+        `• !empresa [texto] — definir informações da empresa\n` +
+        `• !faq [texto] — definir perguntas frequentes\n` +
+        `• !produtos [texto] — definir produtos e serviços\n` +
+        `• !politicas [texto] — definir políticas\n` +
+        `• !ver empresa/faq/produtos/politicas — ver conteúdo atual\n` +
+        `• Envie um documento PDF ou XLSX para eu aprender com ele`
+      );
+      return;
+    }
+
+    if (texto === '!configurar gestores') {
+      atualizarEnv('ID_GRUPO_GESTORES', jid);
+      config.whatsapp.idGrupoGestores = jid;
+      await enviarMensagem(
+        jid,
+        `✅ *Grupo de Gestores configurado!*\n\n` +
+        `Vou enviar aqui os alertas e escalações de atendimento que precisam de atenção humana.\n\n` +
+        `Quando um cliente precisar de um gestor, vocês verão a notificação neste grupo e poderão responder diretamente aqui.`
+      );
+      return;
+    }
+  }
 
   // ── Grupo de treinamento ────────────────────────────────────────────────
   if (config.whatsapp.idGrupoTreinamento && jid === config.whatsapp.idGrupoTreinamento) {
