@@ -11,7 +11,13 @@ import { processarRespostaGestor } from '../conhecimento/aprendizado';
 function extrairTexto(msg: proto.IWebMessageInfo): string | null {
   const m = msg.message;
   if (!m) return null;
-  return m.conversation ?? m.extendedTextMessage?.text ?? m.imageMessage?.caption ?? m.videoMessage?.caption ?? null;
+  return (
+    m.conversation ??
+    m.extendedTextMessage?.text ??
+    m.imageMessage?.caption ??
+    m.videoMessage?.caption ??
+    null
+  );
 }
 
 function extrairIdCitado(msg: proto.IWebMessageInfo): string | null {
@@ -35,12 +41,20 @@ export async function roteadorMensagens(msg: proto.IWebMessageInfo): Promise<voi
   const jid = msg.key.remoteJid;
   if (!jid) return;
 
-  const textoRaw = extrairTexto(msg)?.trim();
+  const textoRaw = extrairTexto(msg)?.trim() ?? '';
+  const tipoMensagem = Object.keys(msg.message ?? {}).join(',');
 
-  // ── Comandos de setup: sem @menção, sem texto obrigatório ───────────────
+  // ── LOG PRINCIPAL: toda mensagem que chega ──────────────────────────────
+  console.log(`\n📨 MENSAGEM RECEBIDA`);
+  console.log(`   JID: ${jid}`);
+  console.log(`   Tipo: ${tipoMensagem}`);
+  console.log(`   Texto: "${textoRaw.substring(0, 100)}"`);
+  console.log(`   É grupo: ${ehGrupo(jid)}`);
+
+  // ── Comandos de setup sem @menção ───────────────────────────────────────
   if (ehGrupo(jid) && textoRaw) {
     if (textoRaw === '!id') {
-      await enviarMensagem(jid, `🆔 *ID deste grupo:*\n\`${jid}\`\n\nUse \`!configurar treinamento\` ou \`!configurar gestores\` para configurar direto.`);
+      await enviarMensagem(jid, `🆔 *ID deste grupo:*\n\`${jid}\`\n\nUse \`!configurar treinamento\` ou \`!configurar gestores\`.`);
       return;
     }
     if (textoRaw === '!configurar treinamento') {
@@ -48,8 +62,7 @@ export async function roteadorMensagens(msg: proto.IWebMessageInfo): Promise<voi
       config.whatsapp.idGrupoTreinamento = jid;
       await enviarMensagem(jid,
         `✅ *Grupo de Treinamento configurado!*\n\n` +
-        `Me @mencione aqui para me ensinar qualquer coisa em linguagem natural.\n\n` +
-        `Exemplos:\n• _"@agente nosso prazo de entrega é 5 dias úteis"_\n• _"@agente quando pedirem desconto, máximo 10% no Pix"_\n\n` +
+        `Me @mencione aqui para me ensinar qualquer coisa em linguagem natural.\n` +
         `Use \`!ajuda\` para todos os comandos.`
       );
       return;
@@ -59,48 +72,63 @@ export async function roteadorMensagens(msg: proto.IWebMessageInfo): Promise<voi
       config.whatsapp.idGrupoGestores = jid;
       await enviarMensagem(jid,
         `✅ *Grupo de Gestores configurado!*\n\n` +
-        `Quando não souber responder um cliente, vou enviar a dúvida aqui.\n\n` +
-        `Para responder: me @mencione com a resposta (pode ou não responder a mensagem):\n` +
-        `_"@agente diga ao cliente que o prazo é 5 dias úteis"_`
+        `Quando não souber responder um cliente, vou enviar a dúvida aqui.\n` +
+        `Me @mencione com a resposta para atender.`
       );
       return;
     }
   }
 
-  // ── Chat particular: sempre responde ────────────────────────────────────
+  // ── Chat particular ─────────────────────────────────────────────────────
   if (!ehGrupo(jid)) {
+    console.log(`   → Chat particular`);
     if (textoRaw) await handleChatParticular(msg);
     return;
   }
 
-  // ── Grupos: TODOS exigem @menção ────────────────────────────────────────
+  // ── Grupos: verifica @menção ────────────────────────────────────────────
   const jidAgente = obterJidDoAgente();
+  console.log(`   JID do agente: "${jidAgente}"`);
+
   if (!jidAgente) {
-    console.warn('[roteador] JID do agente não disponível ainda');
+    console.warn(`   ⚠️  JID do agente ainda não disponível — ignorando`);
     return;
   }
 
-  if (!agenteFoiMencionado(msg, jidAgente)) return;
+  const mencionados = (msg.message?.extendedTextMessage?.contextInfo?.mentionedJid ?? []);
+  const numerosmencionados = mencionados.map(formatarTelefone);
+  const numeroAgente = formatarTelefone(jidAgente);
+  const foiMencionado = agenteFoiMencionado(msg, jidAgente);
 
-  // Texto sem a @menção (pode ser vazio — ex: só mandou "@agente")
+  console.log(`   Número do agente: ${numeroAgente}`);
+  console.log(`   JIDs mencionados: ${mencionados.join(', ') || '(nenhum)'}`);
+  console.log(`   Números mencionados: ${numerosmencionados.join(', ') || '(nenhum)'}`);
+  console.log(`   Texto contém @${numeroAgente}: ${textoRaw.includes(`@${numeroAgente}`)}`);
+  console.log(`   Agente foi mencionado: ${foiMencionado}`);
+
+  if (!foiMencionado) {
+    console.log(`   → Ignorado (agente não mencionado)`);
+    return;
+  }
+
   const texto = textoRaw ? removerMencao(textoRaw, jidAgente) : '';
+  console.log(`   Texto sem @menção: "${texto.substring(0, 80)}"`);
 
   // ── Grupo de treinamento ────────────────────────────────────────────────
   if (config.whatsapp.idGrupoTreinamento && jid === config.whatsapp.idGrupoTreinamento) {
-    console.log(`🎓 [treinamento] @mencionado: "${texto.substring(0, 60)}"`);
-    // Documento mesmo sem texto de acompanhamento
+    console.log(`   → Grupo de TREINAMENTO`);
     if (!texto && !msg.message?.documentMessage) {
-      await enviarMensagem(jid, `👋 Olá! Me ensine algo ou use \`!ajuda\` para ver os comandos disponíveis.`);
+      await enviarMensagem(jid, `👋 Olá! Me ensine algo ou use \`!ajuda\` para ver os comandos.`);
       return;
     }
     await handleTreinamento(msg, texto);
     return;
   }
 
-  // ── Grupo de gestores: responde escalação ───────────────────────────────
+  // ── Grupo de gestores ───────────────────────────────────────────────────
   if (config.whatsapp.idGrupoGestores && jid === config.whatsapp.idGrupoGestores) {
+    console.log(`   → Grupo de GESTORES`);
     if (!texto) {
-      // Listou pendentes
       const pendentes = Escalacoes.listarPendentes();
       if (pendentes.length === 0) {
         await enviarMensagem(jid, '✅ Não há escalações pendentes no momento.');
@@ -110,44 +138,41 @@ export async function roteadorMensagens(msg: proto.IWebMessageInfo): Promise<voi
         ).join('\n\n');
         await enviarMensagem(jid,
           `📋 *${pendentes.length} escalação(ões) pendente(s):*\n\n${lista}\n\n` +
-          `Me @mencione com a resposta para atender a mais recente, ou responda a mensagem específica e me @mencione.`
+          `Me @mencione com a resposta para atender a mais recente.`
         );
       }
       return;
     }
 
-    // Tenta pelo quote (mensagem específica)
     const idCitado = extrairIdCitado(msg);
     if (idCitado) {
       const resultado = processarRespostaGestor(idCitado, texto);
       if (resultado.encontrou) {
         await enviarMensagem(resultado.contatoJid!, resultado.respostaParaCliente!);
         await enviarMensagem(jid, `✅ Resposta enviada ao cliente e conhecimento salvo.`);
-        console.log(`✅ Escalação ${resultado.idEscalacao} resolvida via quote`);
+        console.log(`   ✅ Escalação ${resultado.idEscalacao} resolvida via quote`);
         return;
       }
     }
 
-    // Fallback: usa a escalação pendente mais recente
     const escalacao = Escalacoes.buscarMaisRecentePendente();
     if (!escalacao) {
       await enviarMensagem(jid, '✅ Não há escalações pendentes para responder.');
       return;
     }
-    processarRespostaGestor(escalacao.id, texto);
     Escalacoes.resolver(escalacao.id, texto);
     const { Conhecimentos } = await import('../banco/repositorios/conhecimentos');
     Conhecimentos.salvar(`esc-${escalacao.id}`, escalacao.mensagem_cliente, texto, 'gestor');
     await enviarMensagem(escalacao.contato_jid, texto);
     await enviarMensagem(jid,
-      `✅ Resposta enviada ao cliente *${formatarTelefone(escalacao.contato_jid)}*.\n` +
-      `📚 Conhecimento salvo — nunca mais precisarei perguntar isso.`
+      `✅ Resposta enviada ao cliente *${formatarTelefone(escalacao.contato_jid)}*.\n📚 Salvo — não precisarei perguntar isso novamente.`
     );
-    console.log(`✅ Escalação ${escalacao.id} resolvida via @menção direta`);
+    console.log(`   ✅ Escalação ${escalacao.id} resolvida via @menção direta`);
     return;
   }
 
   // ── Qualquer outro grupo ────────────────────────────────────────────────
+  console.log(`   → Grupo PERSONALIZADO`);
   if (!texto) return;
   await handleMencaoGrupo(msg);
 }
