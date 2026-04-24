@@ -20,76 +20,84 @@ function ehGrupo(jid: string): boolean {
   return jid.endsWith('@g.us');
 }
 
+function removerMencao(texto: string, jidAgente: string): string {
+  const numero = jidAgente.split(':')[0].split('@')[0];
+  return texto.replace(new RegExp(`@${numero}\\s*`, 'g'), '').trim();
+}
+
 export async function roteadorMensagens(msg: proto.IWebMessageInfo): Promise<void> {
   const jid = msg.key.remoteJid;
   if (!jid) return;
 
-  const texto = extrairTexto(msg)?.trim();
-  if (!texto) return;
+  const textoRaw = extrairTexto(msg)?.trim();
+  if (!textoRaw) return;
 
-  // ── Comandos de setup (funcionam em QUALQUER grupo) ──────────────────────
+  // ── Comandos de setup (qualquer grupo, sem precisar de @menção) ──────────
   if (ehGrupo(jid)) {
-    if (texto === '!id') {
-      await enviarMensagem(jid, `🆔 *ID deste grupo:*\n\`${jid}\`\n\nCopie este ID e cole no arquivo \`.env\`.`);
+    if (textoRaw === '!id') {
+      await enviarMensagem(jid, `🆔 *ID deste grupo:*\n\`${jid}\`\n\nCopie e cole no .env ou use \`!configurar treinamento\` / \`!configurar gestores\`.`);
       return;
     }
-
-    if (texto === '!configurar treinamento') {
+    if (textoRaw === '!configurar treinamento') {
       atualizarEnv('ID_GRUPO_TREINAMENTO', jid);
       config.whatsapp.idGrupoTreinamento = jid;
-      await enviarMensagem(
-        jid,
+      await enviarMensagem(jid,
         `✅ *Grupo de Treinamento configurado!*\n\n` +
-        `A partir de agora eu aprendo tudo que você me ensinar aqui.\n\n` +
-        `📋 *Comandos disponíveis neste grupo:*\n` +
-        `• !ajuda — ver todos os comandos\n` +
-        `• !empresa [texto] — definir informações da empresa\n` +
-        `• !faq [texto] — definir perguntas frequentes\n` +
-        `• !produtos [texto] — definir produtos e serviços\n` +
-        `• !politicas [texto] — definir políticas\n` +
-        `• !ver empresa/faq/produtos/politicas — ver conteúdo atual\n` +
-        `• Envie um documento PDF ou XLSX para eu aprender com ele`
+        `Me @mencione aqui para me ensinar qualquer coisa.\n\n` +
+        `Exemplos:\n• _"@agente nosso prazo de entrega é 5 dias úteis"_\n• _"@agente quando pedirem desconto, máximo 10% no Pix"_\n\n` +
+        `Use \`!ajuda\` para ver todos os comandos.`
       );
       return;
     }
-
-    if (texto === '!configurar gestores') {
+    if (textoRaw === '!configurar gestores') {
       atualizarEnv('ID_GRUPO_GESTORES', jid);
       config.whatsapp.idGrupoGestores = jid;
-      await enviarMensagem(
-        jid,
+      await enviarMensagem(jid,
         `✅ *Grupo de Gestores configurado!*\n\n` +
-        `Vou enviar aqui os alertas e escalações de atendimento que precisam de atenção humana.\n\n` +
-        `Quando um cliente precisar de um gestor, vocês verão a notificação neste grupo e poderão responder diretamente aqui.`
+        `Quando eu não souber responder um cliente, vou enviar a dúvida aqui.\n\n` +
+        `Para responder: *responda* a mensagem da dúvida e me @mencione com a resposta.\n` +
+        `Exemplo: _"@agente Diga ao cliente que o prazo é 5 dias úteis"_\n\n` +
+        `Eu encaminho ao cliente e aprendo para nunca mais precisar perguntar.`
       );
       return;
     }
   }
+
+  if (!ehGrupo(jid)) {
+    // ── Chat particular: sempre responde ────────────────────────────────────
+    await handleChatParticular(msg);
+    return;
+  }
+
+  // ── A partir daqui: apenas grupos — TODOS exigem @menção ────────────────
+  const jidAgente = obterJidDoAgente();
+  if (!jidAgente || !agenteFoiMencionado(msg, jidAgente)) return;
+
+  const texto = removerMencao(textoRaw, jidAgente);
+  if (!texto && !msg.message?.documentMessage) return;
 
   // ── Grupo de treinamento ────────────────────────────────────────────────
   if (config.whatsapp.idGrupoTreinamento && jid === config.whatsapp.idGrupoTreinamento) {
-    await handleTreinamento(msg);
+    await handleTreinamento(msg, texto);
     return;
   }
 
-  if (ehGrupo(jid)) {
-    // ── Grupo de gestores: roteador de respostas às escalações ──────────
-    if (config.whatsapp.idGrupoGestores && jid === config.whatsapp.idGrupoGestores) {
-      const idCitado = extrairIdCitado(msg);
-      if (idCitado) {
-        await handleRespostaGestor(msg, texto);
-      }
-      return;
-    }
-
-    // ── Qualquer outro grupo: só responde quando @mencionado ─────────────
-    const jidAgente = obterJidDoAgente();
-    if (jidAgente && agenteFoiMencionado(msg, jidAgente)) {
-      await handleMencaoGrupo(msg);
+  // ── Grupo de gestores: @menção com resposta a escalação ─────────────────
+  if (config.whatsapp.idGrupoGestores && jid === config.whatsapp.idGrupoGestores) {
+    const idCitado = extrairIdCitado(msg);
+    if (idCitado && texto) {
+      await handleRespostaGestor(msg, texto);
+    } else {
+      await enviarMensagem(jid,
+        `👋 Para responder uma dúvida de cliente:\n` +
+        `1. *Responda* a mensagem da escalação\n` +
+        `2. Me @mencione com a resposta\n\n` +
+        `Exemplo: _"@agente Diga ao cliente que o prazo é 5 dias úteis"_`
+      );
     }
     return;
   }
 
-  // ── Chat particular ─────────────────────────────────────────────────────
-  await handleChatParticular(msg);
+  // ── Qualquer outro grupo: @menção → agente opera conforme papel ──────────
+  await handleMencaoGrupo(msg);
 }

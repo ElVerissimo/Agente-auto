@@ -105,5 +105,14 @@ function inicializarEsquema(db: Database.Database): void {
       ativo           INTEGER NOT NULL DEFAULT 1,
       criado_em       INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS regras_comportamento (
+      id            TEXT PRIMARY KEY,
+      descricao     TEXT NOT NULL,
+      instrucao     TEXT NOT NULL,
+      ativa         INTEGER NOT NULL DEFAULT 1,
+      criado_em     INTEGER NOT NULL,
+      atualizado_em INTEGER NOT NULL
+    );
   `);
 }

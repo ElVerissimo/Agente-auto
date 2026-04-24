@@ -6,8 +6,9 @@ import { TipoGrupo } from './tipos';
 import { config } from '../config';
 
 interface RespostaConfiguracao {
+  configurado: boolean;
   tipo: TipoGrupo;
-  confirmacao: string;
+  resposta: string;
   instrucoes: string;
 }
 
@@ -18,6 +19,9 @@ interface RespostaOperacao {
   confianca: number;
 }
 
+// Histórico de configuração em memória (por grupo)
+const historicoConfig = new Map<string, MensagemHistorico[]>();
+
 export async function processarMencaoGrupo(params: {
   idGrupo: string;
   nomeGrupo: string;
@@ -26,48 +30,52 @@ export async function processarMencaoGrupo(params: {
 }): Promise<string> {
   const grupo = Grupos.buscar(params.idGrupo);
 
-  // Primeira menção — criar e perguntar o papel
+  // Primeiro contato — registrar e iniciar configuração
   if (!grupo) {
-    Grupos.salvar({
-      idGrupo: params.idGrupo,
-      nome: params.nomeGrupo,
-      descricao: '',
-      tipo: 'geral',
-      status: 'configurando',
-    });
+    Grupos.salvar({ idGrupo: params.idGrupo, nome: params.nomeGrupo, descricao: '', tipo: 'geral', status: 'configurando' });
+    historicoConfig.set(params.idGrupo, []);
     return (
-      `Olá! 👋 Estou aqui e pronto para trabalhar neste grupo.\n\n` +
-      `Para começar, me explique qual é o meu papel aqui — o que devo fazer e como?\n\n` +
-      `_Quanto mais detalhes você der, melhor vou conseguir ajudar._`
+      `Olá! 👋 Fui adicionado a *${params.nomeGrupo}*.\n\n` +
+      `Sou um agente autônomo e preciso entender meu papel aqui antes de começar.\n\n` +
+      `Me explique: *para que serve este grupo e o que você quer que eu faça aqui?*\n\n` +
+      `_Quanto mais detalhes, melhor — vou perguntar até entender tudo direito._`
     );
   }
 
-  // Em configuração — receber instruções
+  // Em configuração — diálogo até entender completamente
   if (grupo.status === 'configurando') {
+    const historico = historicoConfig.get(params.idGrupo) ?? [];
+    historico.push({ papel: 'usuario', conteudo: params.mensagem });
+
     const respostaRaw = await chat({
       sistema: PROMPT_CONFIGURACAO_GRUPO,
+      historico: historico.slice(0, -1),
       mensagem: params.mensagem,
-      maxTokens: 512,
+      maxTokens: 768,
       formatoJson: true,
     });
 
     const resultado = parseJson<RespostaConfiguracao>(respostaRaw);
-    const tipo: TipoGrupo = resultado?.tipo ?? 'geral';
-    const instrucoes = resultado?.instrucoes ?? params.mensagem;
-    const confirmacao = resultado?.confirmacao ?? '✅ Configuração salva! Estou pronto para operar neste grupo.';
+    const resposta = resultado?.resposta ?? 'Pode me explicar melhor?';
 
-    Grupos.salvar({
-      idGrupo: params.idGrupo,
-      nome: params.nomeGrupo,
-      descricao: instrucoes,
-      tipo,
-      status: 'ativo',
-    });
+    historico.push({ papel: 'assistente', conteudo: resposta });
+    historicoConfig.set(params.idGrupo, historico);
 
-    return confirmacao;
+    if (resultado?.configurado && resultado.instrucoes) {
+      Grupos.salvar({
+        idGrupo: params.idGrupo,
+        nome: params.nomeGrupo,
+        descricao: resultado.instrucoes,
+        tipo: resultado.tipo ?? 'geral',
+        status: 'ativo',
+      });
+      historicoConfig.delete(params.idGrupo);
+    }
+
+    return resposta;
   }
 
-  // Ativo — operar conforme papel
+  // Ativo — operar conforme papel configurado
   const historico = Conversas.buscarHistorico(params.idGrupo, 10);
   const sistemaPrompt = promptOperacaoGrupo(grupo.descricao, config.whatsapp.nomeAgente);
 

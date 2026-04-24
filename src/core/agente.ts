@@ -4,6 +4,7 @@ import { carregarContextoEmpresa } from '../conhecimento/contexto';
 import { Habilidades } from '../banco/repositorios/habilidades';
 import { Conhecimentos } from '../banco/repositorios/conhecimentos';
 import { Documentos } from '../banco/repositorios/documentos';
+import { Regras } from '../banco/repositorios/regras';
 import { obterContexto, salvarMensagem } from '../conversa/historico';
 import { resumirSeNecessario } from '../conversa/resumidor';
 import { classificarMensagem } from './classificador';
@@ -95,6 +96,7 @@ export async function processarMensagemCliente(params: {
     conhecimentos: Conhecimentos.listarFormatado(),
     documentos: Documentos.contextoFormatado(),
     resumoConversa: resumo,
+    regras: Regras.listarFormatado(),
   });
 
   const respostaRaw = await chat({

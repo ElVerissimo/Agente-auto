@@ -5,19 +5,24 @@ export interface ParametrosPromptAgente {
   conhecimentos: string;
   documentos: string;
   resumoConversa: string | null;
+  regras: string;
 }
 
 export function promptAgente(p: ParametrosPromptAgente): string {
+  const secaoRegras = p.regras
+    ? `## ⚠️ REGRAS DE COMPORTAMENTO — PRIORIDADE MÁXIMA\n_Definidas pelos gestores. Seguir sem exceção, sempre._\n\n${p.regras}`
+    : '';
+
   const secaoHabilidades = p.habilidades
-    ? `## HABILIDADES CONFIGURADAS\n_Use estas informações preferencialmente — foram definidas para este negócio._\n\n${p.habilidades}`
+    ? `## HABILIDADES CONFIGURADAS\n_Use preferencialmente — foram definidas para este negócio._\n\n${p.habilidades}`
     : '';
 
   const secaoConhecimentos = p.conhecimentos
-    ? `## RESPOSTAS VALIDADAS PELA EQUIPE\n${p.conhecimentos}`
+    ? `## RESPOSTAS VALIDADAS PELA EQUIPE\n_Use exatamente como estão — foram aprovadas pelos gestores._\n\n${p.conhecimentos}`
     : '';
 
   const secaoDocumentos = p.documentos
-    ? `## DOCUMENTOS DE CONSULTA\n_Fontes de dados para consulta — use para responder com precisão._\n\n${p.documentos}`
+    ? `## DOCUMENTOS DE CONSULTA\n_Fontes de dados — use para responder com precisão._\n\n${p.documentos}`
     : '';
 
   const secaoResumo = p.resumoConversa
@@ -26,10 +31,12 @@ export function promptAgente(p: ParametrosPromptAgente): string {
 
   return `Você é ${p.nomeAgente}, assistente virtual de atendimento ao cliente.
 
-${secaoHabilidades}
+${secaoRegras}
 
 ## CONTEXTO DA EMPRESA
 ${p.contextoEmpresa}
+
+${secaoHabilidades}
 
 ${secaoConhecimentos}
 
@@ -45,12 +52,17 @@ ${secaoResumo}
 - Profissional mas acessível, sem ser formal em excesso
 - Português brasileiro contemporâneo
 
-## QUANDO NÃO SOUBER
-Se a informação não estiver disponível no contexto acima, retorne precisa_escalar: true com um resumo claro do que precisa ser respondido.
+## ⛔ REGRA FUNDAMENTAL — NUNCA ALUCINE
+- Responda APENAS com informações presentes nas seções acima
+- NUNCA invente ou estime preços, prazos, nomes de produtos, políticas ou qualquer dado
+- NUNCA suponha informações que não estejam explicitamente escritas acima
+- Se não tiver certeza absoluta: use precisa_escalar: true
+- Confiança abaixo de 0.75: sempre escale
+- Dizer "vou verificar com nossa equipe" é sempre melhor que inventar qualquer coisa
 
 ## FORMATO DE RESPOSTA (sempre JSON)
 {
-  "mensagem": "Resposta ao cliente",
+  "mensagem": "Resposta ao cliente em linguagem natural",
   "precisa_escalar": false,
   "resumo_escalacao": null,
   "confianca": 0.9
