@@ -1,6 +1,6 @@
 import { proto } from '@whiskeysockets/baileys';
 import { processarMencaoGrupo } from '../../grupos/gerenciador';
-import { enviarMensagem, obterJidDoAgente, obterLidDoAgente, obterNomeGrupo } from '../cliente';
+import { enviarMensagem, obterJidDoAgente, obterLidDoAgente, definirLidAgente, obterNomeGrupo } from '../cliente';
 
 function extrairTexto(msg: proto.IWebMessageInfo): string | null {
   const m = msg.message;
@@ -27,16 +27,29 @@ function removerMencaoDoTexto(texto: string, numeroAgente: string): string {
 export function agenteFoiMencionado(msg: proto.IWebMessageInfo, jidAgente: string): boolean {
   if (!jidAgente) return false;
   const numero = formatarTelefone(jidAgente);
-  const lid = obterLidDoAgente(); // LID do agente (formato novo do WhatsApp)
+  const lid = obterLidDoAgente();
   const mencionados = listarMencionados(msg);
   const texto = extrairTexto(msg) ?? '';
 
-  const mencionadoPorJid = mencionados.some((jid) => {
-    const n = formatarTelefone(jid);
-    return n === numero || (lid && n === lid);
-  });
+  // Verifica por número de telefone (formato antigo)
+  if (mencionados.some((jid) => formatarTelefone(jid) === numero)) return true;
 
-  return mencionadoPorJid || texto.includes(`@${numero}`) || (!!lid && texto.includes(`@${lid}`));
+  // Verifica por LID já conhecido
+  if (lid && mencionados.some((jid) => formatarTelefone(jid) === lid)) return true;
+
+  // Verifica no texto
+  if (texto.includes(`@${numero}`)) return true;
+  if (lid && texto.includes(`@${lid}`)) return true;
+
+  // Auto-descoberta: se todos os mencionados são @lid e ainda não temos o LID,
+  // assume que a única menção @lid é para o agente e aprende o LID
+  const todosLid = mencionados.length > 0 && mencionados.every((jid) => jid.endsWith('@lid'));
+  if (todosLid && mencionados.length === 1 && !lid) {
+    definirLidAgente(formatarTelefone(mencionados[0]));
+    return true;
+  }
+
+  return false;
 }
 
 export async function handleMencaoGrupo(msg: proto.IWebMessageInfo): Promise<void> {

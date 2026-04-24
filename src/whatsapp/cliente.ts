@@ -96,12 +96,22 @@ export function obterJidDoAgente(): string {
   return `${socket.user.id.split(':')[0].split('@')[0]}@s.whatsapp.net`;
 }
 
+let lidAgenteCache = '';
+
 export function obterLidDoAgente(): string {
+  if (lidAgenteCache) return lidAgenteCache;
   if (!socket?.user) return '';
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const lid = (socket.user as any).lid as string | undefined;
-  if (!lid) return '';
-  return lid.split(':')[0].split('@')[0];
+  if (lid) lidAgenteCache = lid.split(':')[0].split('@')[0];
+  return lidAgenteCache;
+}
+
+export function definirLidAgente(lid: string): void {
+  if (!lidAgenteCache && lid) {
+    lidAgenteCache = lid;
+    console.log(`🆔 LID do agente descoberto automaticamente: ${lid}`);
+  }
 }
 
 export async function obterNomeGrupo(idGrupo: string): Promise<string> {
