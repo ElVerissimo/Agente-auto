@@ -28,6 +28,22 @@ export const Escalacoes = {
       .get(idMensagemGrupo) as Escalacao | undefined;
   },
 
+  buscarMaisRecentePendente(): Escalacao | undefined {
+    return getBanco()
+      .prepare(`SELECT id, contato_jid, mensagem_cliente, tentativa_agente
+                FROM escalacoes WHERE status = 'pendente'
+                ORDER BY criado_em DESC LIMIT 1`)
+      .get() as Escalacao | undefined;
+  },
+
+  listarPendentes(): Escalacao[] {
+    return getBanco()
+      .prepare(`SELECT id, contato_jid, mensagem_cliente, tentativa_agente
+                FROM escalacoes WHERE status = 'pendente'
+                ORDER BY criado_em ASC`)
+      .all() as Escalacao[];
+  },
+
   resolver(id: string, respostaGestor: string): void {
     getBanco()
       .prepare(`UPDATE escalacoes SET status = 'resolvida', resposta_gestor = ?, resolvido_em = ? WHERE id = ?`)
