@@ -96,6 +96,14 @@ export function obterJidDoAgente(): string {
   return `${socket.user.id.split(':')[0].split('@')[0]}@s.whatsapp.net`;
 }
 
+export function obterLidDoAgente(): string {
+  if (!socket?.user) return '';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lid = (socket.user as any).lid as string | undefined;
+  if (!lid) return '';
+  return lid.split(':')[0].split('@')[0];
+}
+
 export async function obterNomeGrupo(idGrupo: string): Promise<string> {
   if (!socket) return idGrupo;
   try {

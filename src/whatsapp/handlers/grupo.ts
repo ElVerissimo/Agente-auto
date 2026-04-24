@@ -1,6 +1,6 @@
 import { proto } from '@whiskeysockets/baileys';
 import { processarMencaoGrupo } from '../../grupos/gerenciador';
-import { enviarMensagem, obterJidDoAgente, obterNomeGrupo } from '../cliente';
+import { enviarMensagem, obterJidDoAgente, obterLidDoAgente, obterNomeGrupo } from '../cliente';
 
 function extrairTexto(msg: proto.IWebMessageInfo): string | null {
   const m = msg.message;
@@ -27,9 +27,16 @@ function removerMencaoDoTexto(texto: string, numeroAgente: string): string {
 export function agenteFoiMencionado(msg: proto.IWebMessageInfo, jidAgente: string): boolean {
   if (!jidAgente) return false;
   const numero = formatarTelefone(jidAgente);
+  const lid = obterLidDoAgente(); // LID do agente (formato novo do WhatsApp)
   const mencionados = listarMencionados(msg);
   const texto = extrairTexto(msg) ?? '';
-  return mencionados.some((jid) => formatarTelefone(jid) === numero) || texto.includes(`@${numero}`);
+
+  const mencionadoPorJid = mencionados.some((jid) => {
+    const n = formatarTelefone(jid);
+    return n === numero || (lid && n === lid);
+  });
+
+  return mencionadoPorJid || texto.includes(`@${numero}`) || (!!lid && texto.includes(`@${lid}`));
 }
 
 export async function handleMencaoGrupo(msg: proto.IWebMessageInfo): Promise<void> {

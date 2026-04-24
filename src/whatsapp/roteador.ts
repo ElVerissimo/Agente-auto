@@ -3,7 +3,7 @@ import { config } from '../config';
 import { handleChatParticular } from './handlers/particular';
 import { handleMencaoGrupo, handleRespostaGestor, agenteFoiMencionado } from './handlers/grupo';
 import { handleTreinamento } from './handlers/treinamento';
-import { enviarMensagem, obterJidDoAgente } from './cliente';
+import { enviarMensagem, obterJidDoAgente, obterLidDoAgente } from './cliente';
 import { atualizarEnv } from '../utils/env-writer';
 import { Escalacoes } from '../banco/repositorios/escalacoes';
 import { processarRespostaGestor } from '../conhecimento/aprendizado';
@@ -100,7 +100,9 @@ export async function roteadorMensagens(msg: proto.IWebMessageInfo): Promise<voi
   const numeroAgente = formatarTelefone(jidAgente);
   const foiMencionado = agenteFoiMencionado(msg, jidAgente);
 
+  const lidAgente = obterLidDoAgente();
   console.log(`   Número do agente: ${numeroAgente}`);
+  console.log(`   LID do agente:    ${lidAgente || '(não disponível)'}`);
   console.log(`   JIDs mencionados: ${mencionados.join(', ') || '(nenhum)'}`);
   console.log(`   Números mencionados: ${numerosmencionados.join(', ') || '(nenhum)'}`);
   console.log(`   Texto contém @${numeroAgente}: ${textoRaw.includes(`@${numeroAgente}`)}`);
