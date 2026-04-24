@@ -1,32 +1,33 @@
 import 'dotenv/config';
 
-function env(key: string, fallback?: string): string {
-  const value = process.env[key] ?? fallback;
-  if (value === undefined) {
-    throw new Error(`Variável de ambiente obrigatória não definida: ${key}`);
+function env(chave: string, padrao?: string): string {
+  const valor = process.env[chave] ?? padrao;
+  if (valor === undefined) {
+    throw new Error(`Variável de ambiente obrigatória não definida: ${chave}`);
   }
-  return value;
+  return valor;
 }
 
 export const config = {
-  openai: {
-    apiKey: env('OPENAI_API_KEY'),
-    model: env('OPENAI_MODEL', 'gpt-4o'),
+  ia: {
+    chaveApi: env('OPENAI_API_KEY'),
+    modelo: env('MODELO_IA', 'gpt-4o'),
   },
   whatsapp: {
-    managersGroupId: env('MANAGERS_GROUP_ID', ''),
-    trainingGroupId: env('TRAINING_GROUP_ID', ''),
-    agentName: env('AGENT_NAME', 'Assistente Virtual'),
-    authDir: 'auth_info_baileys',
+    idGrupoGestores: env('ID_GRUPO_GESTORES', ''),
+    idGrupoTreinamento: env('ID_GRUPO_TREINAMENTO', ''),
+    nomeAgente: env('NOME_AGENTE', 'Assistente Virtual'),
+    diretorioAuth: 'auth_info_baileys',
   },
-  agent: {
-    confidenceThreshold: parseFloat(env('CONFIDENCE_THRESHOLD', '0.7')),
-    maxHistoryLength: parseInt(env('MAX_HISTORY_LENGTH', '20')),
-    escalationTimeoutMs: parseInt(env('ESCALATION_TIMEOUT_MS', '3600000')),
-    summarizeAfterMessages: parseInt(env('SUMMARIZE_AFTER_MESSAGES', '15')),
+  agente: {
+    limiarConfianca: parseFloat(env('LIMIAR_CONFIANCA', '0.7')),
+    maxHistoricoMensagens: parseInt(env('MAX_HISTORICO_MENSAGENS', '20')),
+    resumirAposMensagens: parseInt(env('RESUMIR_APOS_MENSAGENS', '15')),
+    timeoutEscalacaoMs: parseInt(env('TIMEOUT_ESCALACAO_MS', '3600000')),
   },
-  paths: {
-    companyContext: 'data/company-context',
-    database: 'data/memory.db',
+  caminhos: {
+    contextoEmpresa: 'data/contexto-empresa',
+    baseConhecimento: 'data/base-conhecimento',
+    bancoDados: 'data/memoria.db',
   },
 } as const;

@@ -1,7 +1,7 @@
 {
   "name": "agente-auto",
-  "version": "1.0.0",
-  "description": "Agente autônomo para WhatsApp - Gerente Geral de Atendimento",
+  "version": "2.0.0",
+  "description": "Agente autônomo de atendimento via WhatsApp com IA",
   "scripts": {
     "start": "tsx src/index.ts",
     "dev": "tsx watch src/index.ts",
@@ -9,17 +9,20 @@
     "start:prod": "node dist/index.js"
   },
   "dependencies": {
-    "openai": "^4.97.0",
     "@hapi/boom": "^10.0.1",
     "@whiskeysockets/baileys": "^6.7.9",
     "better-sqlite3": "^11.9.1",
     "dotenv": "^16.4.5",
+    "openai": "^4.97.0",
+    "pdf-parse": "^1.1.1",
     "pino": "^9.6.0",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.14.1",
+    "@types/pdf-parse": "^1.1.4",
     "@types/uuid": "^10.0.0",
     "tsx": "^4.19.3",
     "typescript": "^5.8.3"
