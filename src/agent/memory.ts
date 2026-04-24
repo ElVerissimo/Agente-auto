@@ -69,6 +69,16 @@ function initSchema(database: Database.Database): void {
       messages_summarized INTEGER NOT NULL DEFAULT 0,
       updated_at INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS group_configs (
+      group_jid TEXT PRIMARY KEY,
+      group_name TEXT NOT NULL DEFAULT '',
+      instructions TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'setup'
+        CHECK(status IN ('setup', 'active')),
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
   `);
 }
 
@@ -283,4 +293,45 @@ export function saveConversationSummary(
          updated_at = excluded.updated_at`
     )
     .run(contactJid, summary, messagesSummarized, Date.now());
+}
+
+// ── Group configs ─────────────────────────────────────────────────────────────
+
+export interface GroupConfigRow {
+  group_jid: string;
+  group_name: string;
+  instructions: string;
+  status: 'setup' | 'active';
+}
+
+export function getGroupConfig(groupJid: string): GroupConfigRow | undefined {
+  return getDb()
+    .prepare('SELECT group_jid, group_name, instructions, status FROM group_configs WHERE group_jid = ?')
+    .get(groupJid) as GroupConfigRow | undefined;
+}
+
+export function saveGroupConfig(params: {
+  groupJid: string;
+  groupName: string;
+  instructions: string;
+  status: 'setup' | 'active';
+}): void {
+  const now = Date.now();
+  getDb()
+    .prepare(
+      `INSERT INTO group_configs (group_jid, group_name, instructions, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(group_jid) DO UPDATE SET
+         group_name = excluded.group_name,
+         instructions = excluded.instructions,
+         status = excluded.status,
+         updated_at = excluded.updated_at`
+    )
+    .run(params.groupJid, params.groupName, params.instructions, params.status, now, now);
+}
+
+export function listGroupConfigs(): GroupConfigRow[] {
+  return getDb()
+    .prepare('SELECT group_jid, group_name, instructions, status FROM group_configs ORDER BY group_name')
+    .all() as GroupConfigRow[];
 }

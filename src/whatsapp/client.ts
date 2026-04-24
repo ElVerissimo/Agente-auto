@@ -84,11 +84,29 @@ export async function connectWhatsApp(): Promise<WASocket> {
 export async function sendText(
   jid: string,
   text: string,
-  quotedMsg?: proto.IWebMessageInfo
+  quotedMsg?: proto.IWebMessageInfo,
+  mentions?: string[]
 ): Promise<proto.IWebMessageInfo | undefined> {
   if (!sock) throw new Error('WhatsApp não conectado');
   const opts = quotedMsg ? { quoted: quotedMsg } : undefined;
-  return sock.sendMessage(jid, { text }, opts);
+  return sock.sendMessage(jid, { text, mentions }, opts);
+}
+
+export function getBotJid(): string {
+  if (!sock?.user?.id) return '';
+  // Normalize: "5511999999999:0@s.whatsapp.net" → "5511999999999@s.whatsapp.net"
+  const number = sock.user.id.split(':')[0].split('@')[0];
+  return `${number}@s.whatsapp.net`;
+}
+
+export async function getGroupName(groupJid: string): Promise<string> {
+  if (!sock) return groupJid;
+  try {
+    const metadata = await sock.groupMetadata(groupJid);
+    return metadata.subject || groupJid;
+  } catch {
+    return groupJid;
+  }
 }
 
 export function getSocket(): WASocket | null {

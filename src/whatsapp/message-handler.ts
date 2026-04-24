@@ -3,7 +3,8 @@ import { config } from '../config';
 import { processClientMessage, recordEscalationGroupMessage } from '../agent/agent';
 import { processManagerAnswer } from '../agent/escalation';
 import { handleTrainingMessage } from './training-handler';
-import { sendText } from './client';
+import { handleGroupMention, isBotMentioned } from './group-handler';
+import { sendText, getBotJid } from './client';
 
 function extractText(msg: proto.IWebMessageInfo): string | null {
   const m = msg.message;
@@ -21,8 +22,12 @@ function extractQuotedId(msg: proto.IWebMessageInfo): string | null {
   return msg.message?.extendedTextMessage?.contextInfo?.stanzaId ?? null;
 }
 
+function isGroup(jid: string): boolean {
+  return jid.endsWith('@g.us');
+}
+
 function formatPhone(jid: string): string {
-  return jid.replace(/@[sg]\.whatsapp\.net|@g\.us/, '');
+  return jid.replace(/@[sg]\.whatsapp\.net|@g\.us/, '').split(':')[0];
 }
 
 export async function handleMessage(msg: proto.IWebMessageInfo): Promise<void> {
@@ -32,20 +37,16 @@ export async function handleMessage(msg: proto.IWebMessageInfo): Promise<void> {
   const text = extractText(msg)?.trim();
   if (!text) return;
 
-  // ── Training group: teach new skills ──────────────────────────────────
+  // ── Training group ─────────────────────────────────────────────────────
   if (config.whatsapp.trainingGroupId && jid === config.whatsapp.trainingGroupId) {
     await handleTrainingMessage(msg);
     return;
   }
 
-  const isManagersGroup = config.whatsapp.managersGroupId
-    ? jid === config.whatsapp.managersGroupId
-    : false;
-
-  // ── Managers group: route answers back to clients ──────────────────────
-  if (isManagersGroup) {
+  // ── Managers group: route escalation answers back to clients ───────────
+  if (config.whatsapp.managersGroupId && jid === config.whatsapp.managersGroupId) {
     const quotedId = extractQuotedId(msg);
-    if (!quotedId) return; // Only care about replies
+    if (!quotedId) return;
 
     const result = processManagerAnswer(quotedId, text);
     if (!result.found) return;
@@ -56,7 +57,17 @@ export async function handleMessage(msg: proto.IWebMessageInfo): Promise<void> {
     return;
   }
 
-  // ── Client message ─────────────────────────────────────────────────────
+  // ── Any other group: respond only when @mentioned ──────────────────────
+  if (isGroup(jid)) {
+    const botJid = getBotJid();
+    if (botJid && isBotMentioned(msg, botJid)) {
+      await handleGroupMention(msg, botJid);
+    }
+    // Silently ignore group messages without @mention
+    return;
+  }
+
+  // ── Private/client message ─────────────────────────────────────────────
   const phone = formatPhone(jid);
   console.log(`📩 [${phone}] ${text.substring(0, 80)}${text.length > 80 ? '...' : ''}`);
 
@@ -72,7 +83,7 @@ export async function handleMessage(msg: proto.IWebMessageInfo): Promise<void> {
 
     if (result.escalation) {
       if (!config.whatsapp.managersGroupId) {
-        console.warn('⚠️  Escalação gerada mas MANAGERS_GROUP_ID não configurado — ignorando envio ao grupo.');
+        console.warn('⚠️  Escalação gerada mas MANAGERS_GROUP_ID não configurado.');
         return;
       }
 
