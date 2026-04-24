@@ -5,6 +5,7 @@ import { processarComandoTreinamento } from '../../conhecimento/habilidades';
 import { processarDocumento } from '../../conhecimento/documentos';
 import { recarregarContexto } from '../../conhecimento/contexto';
 import { enviarMensagem } from '../cliente';
+import { setupAtivo, iniciarSetup, processarRespostaSetup } from './setup';
 
 const DIR_CONTEXTO = 'data/contexto-empresa';
 
@@ -17,29 +18,29 @@ const ARQUIVOS_CONTEXTO: Record<string, string> = {
 
 const AJUDA = `🎓 *Comandos do Grupo de Treinamento:*
 
-*Configurar informações da empresa:*
+*Configuração guiada (recomendado):*
+• \`!setup\` — inicia uma conversa passo a passo para configurar tudo
+
+*Atualizar informações individualmente:*
 • \`!empresa [texto]\` — define as informações da empresa
 • \`!faq [texto]\` — define as perguntas frequentes
 • \`!produtos [texto]\` — define os produtos e serviços
 • \`!politicas [texto]\` — define as políticas
 
 *Ver conteúdo atual:*
-• \`!ver empresa\`
-• \`!ver faq\`
-• \`!ver produtos\`
-• \`!ver politicas\`
+• \`!ver empresa\`, \`!ver faq\`, \`!ver produtos\`, \`!ver politicas\`
 
 *Ensinar habilidades:*
-• Escreva em linguagem natural o que quero que o agente aprenda
-• Ex: "Quando alguém perguntar sobre prazo de entrega, responder que é de 3 dias úteis"
+• Escreva em linguagem natural o que o agente deve aprender
+• Ex: "Quando perguntarem sobre prazo, diga que é 3 dias úteis"
 
-*Enviar documentos:*
-• Envie um arquivo PDF, XLSX ou TXT e o agente aprende o conteúdo
+*Documentos:*
+• Envie um PDF, XLSX ou TXT e o agente aprende o conteúdo
 
-*Listar habilidades:*
-• \`listar habilidades\`
+*Outros:*
+• \`listar habilidades\` — mostra o que já foi ensinado
 
-💡 _Dica: para atualizar um arquivo, envie \`!empresa\` seguido do novo texto completo._`;
+💡 _Use \`!setup\` para uma configuração guiada completa._`;
 
 function extrairTexto(msg: proto.IWebMessageInfo): string | null {
   const m = msg.message;
@@ -85,6 +86,18 @@ export async function handleTreinamento(msg: proto.IWebMessageInfo): Promise<voi
   if (!texto) return;
 
   console.log(`🎓 [treinamento] ${texto.substring(0, 80)}`);
+
+  // !setup — configuração guiada conversacional
+  if (texto === '!setup') {
+    await iniciarSetup(jid);
+    return;
+  }
+
+  // Se há uma sessão de setup ativa, roteia para ela (exceto comandos !)
+  if (setupAtivo(jid) && !texto.startsWith('!')) {
+    await processarRespostaSetup(jid, texto);
+    return;
+  }
 
   // !ajuda
   if (texto === '!ajuda') {
