@@ -10,12 +10,14 @@
   },
   "dependencies": {
     "@hapi/boom": "^10.0.1",
+    "@types/qrcode-terminal": "^0.12.2",
     "@whiskeysockets/baileys": "^6.7.9",
     "better-sqlite3": "^11.9.1",
     "dotenv": "^16.4.5",
     "openai": "^4.97.0",
     "pdf-parse": "^1.1.1",
     "pino": "^9.6.0",
+    "qrcode-terminal": "^0.12.0",
     "uuid": "^11.1.0",
     "xlsx": "^0.18.5"
   },

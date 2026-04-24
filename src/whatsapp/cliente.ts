@@ -6,6 +6,8 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const qrcode = require('qrcode-terminal') as { generate: (text: string, opts: { small: boolean }) => void };
 import { config } from '../config';
 
 type HandlerMensagem = (msg: proto.IWebMessageInfo) => Promise<void>;
@@ -24,7 +26,6 @@ export async function conectarWhatsApp(): Promise<WASocket> {
   async function conectar(): Promise<WASocket> {
     const sock = makeWASocket({
       auth: state,
-      printQRInTerminal: true,
       logger,
       browser: ['Agente Virtual', 'Chrome', '120.0.0'],
       generateHighQualityLinkPreview: false,
@@ -35,7 +36,11 @@ export async function conectarWhatsApp(): Promise<WASocket> {
     sock.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect, qr } = update;
 
-      if (qr) console.log('\n📱 Escaneie o QR Code acima com o WhatsApp para autenticar o agente\n');
+      if (qr) {
+        console.log('\n📱 Escaneie o QR Code abaixo com o WhatsApp:\n');
+        qrcode.generate(qr, { small: true });
+        console.log('\n(WhatsApp → Aparelhos conectados → Conectar aparelho)\n');
+      }
 
       if (connection === 'close') {
         const codigo = (lastDisconnect?.error as Boom)?.output?.statusCode;
