@@ -1,9 +1,6 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { v4 as uuidv4 } from 'uuid';
-import { config } from '../config';
+import { callAI } from '../ai/claude';
 import { saveSkill, getAllSkills, deleteSkill, SkillRow } from './memory';
-
-const client = new Anthropic({ apiKey: config.anthropic.apiKey });
 
 const TRAINING_SYSTEM = `Você é um assistente de treinamento de um agente virtual de atendimento ao cliente.
 Sua função é extrair conhecimento das mensagens do treinador e estruturá-lo como uma "Skill".
@@ -40,14 +37,7 @@ type TrainingAction =
   | { action: 'help'; confirmation: string };
 
 export async function processTrainingMessage(message: string): Promise<string> {
-  const response = await client.messages.create({
-    model: config.anthropic.model,
-    max_tokens: 1024,
-    system: TRAINING_SYSTEM,
-    messages: [{ role: 'user', content: message }],
-  });
-
-  const text = response.content[0].type === 'text' ? response.content[0].text : '';
+  const text = await callAI({ system: TRAINING_SYSTEM, userMessage: message });
 
   let parsed: TrainingAction;
   try {

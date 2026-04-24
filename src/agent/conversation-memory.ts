@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { callAI } from '../ai/claude';
 import { config } from '../config';
 import {
   getConversationHistory,
@@ -7,8 +7,6 @@ import {
   saveConversationSummary,
   ConversationRow,
 } from './memory';
-
-const client = new Anthropic({ apiKey: config.anthropic.apiKey });
 
 const SUMMARY_SYSTEM = `Você é um assistente especializado em criar resumos de conversas de atendimento ao cliente.
 
@@ -56,18 +54,14 @@ export async function maybeSummarize(contactJid: string): Promise<void> {
     .join('\n');
 
   try {
-    const response = await client.messages.create({
-      model: config.anthropic.model,
-      max_tokens: 400,
+    const newSummary = await callAI({
       system: SUMMARY_SYSTEM,
-      messages: [{ role: 'user', content: `Conversa:\n${transcript}` }],
+      userMessage: `Conversa:\n${transcript}`,
+      maxTokens: 400,
     });
 
-    const newSummary =
-      response.content[0].type === 'text' ? response.content[0].text.trim() : '';
-
-    if (newSummary) {
-      saveConversationSummary(contactJid, newSummary, totalCount);
+    if (newSummary.trim()) {
+      saveConversationSummary(contactJid, newSummary.trim(), totalCount);
     }
   } catch (err) {
     console.error(`[memory] Erro ao sumarizar conversa de ${contactJid}:`, err);

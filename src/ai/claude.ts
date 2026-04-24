@@ -1,7 +1,7 @@
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import { config } from '../config';
 
-const client = new Anthropic({ apiKey: config.anthropic.apiKey });
+const client = new OpenAI({ apiKey: config.openai.apiKey });
 
 export interface AgentResponse {
   mensagem: string;
@@ -15,27 +15,44 @@ export interface ConversationMessage {
   content: string;
 }
 
+// Shared single-turn helper used by skills and conversation-memory
+export async function callAI(params: {
+  system: string;
+  userMessage: string;
+  maxTokens?: number;
+}): Promise<string> {
+  const response = await client.chat.completions.create({
+    model: config.openai.model,
+    max_tokens: params.maxTokens ?? 1024,
+    messages: [
+      { role: 'system', content: params.system },
+      { role: 'user', content: params.userMessage },
+    ],
+  });
+  return response.choices[0].message.content ?? '';
+}
+
 export async function askClaude(params: {
   systemPrompt: string;
   conversationHistory: ConversationMessage[];
   userMessage: string;
 }): Promise<AgentResponse> {
-  const messages: Anthropic.MessageParam[] = [
+  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    { role: 'system', content: params.systemPrompt },
     ...params.conversationHistory.map((h) => ({
-      role: h.role,
+      role: h.role as 'user' | 'assistant',
       content: h.content,
     })),
     { role: 'user', content: params.userMessage },
   ];
 
-  const response = await client.messages.create({
-    model: config.anthropic.model,
+  const response = await client.chat.completions.create({
+    model: config.openai.model,
     max_tokens: 1024,
-    system: params.systemPrompt,
     messages,
   });
 
-  const text = response.content[0].type === 'text' ? response.content[0].text : '';
+  const text = response.choices[0].message.content ?? '';
 
   try {
     const jsonMatch = text.match(/\{[\s\S]*\}/);

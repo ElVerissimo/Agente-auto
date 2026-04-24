@@ -9,7 +9,7 @@ async function main(): Promise<void> {
   console.log('  🤖 Agente Autônomo WhatsApp');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log(`  Nome:   ${config.whatsapp.agentName}`);
-  console.log(`  Modelo: ${config.anthropic.model}`);
+  console.log(`  Modelo: ${config.openai.model}`);
   console.log(`  Grupo:  ${config.whatsapp.managersGroupId || '(não configurado)'}`);
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 

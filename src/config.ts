@@ -9,9 +9,9 @@ function env(key: string, fallback?: string): string {
 }
 
 export const config = {
-  anthropic: {
-    apiKey: env('ANTHROPIC_API_KEY'),
-    model: env('CLAUDE_MODEL', 'claude-sonnet-4-6'),
+  openai: {
+    apiKey: env('OPENAI_API_KEY'),
+    model: env('OPENAI_MODEL', 'gpt-4o'),
   },
   whatsapp: {
     managersGroupId: env('MANAGERS_GROUP_ID', ''),
