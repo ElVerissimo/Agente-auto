@@ -15,6 +15,7 @@ export const config = {
   },
   whatsapp: {
     managersGroupId: env('MANAGERS_GROUP_ID', ''),
+    trainingGroupId: env('TRAINING_GROUP_ID', ''),
     agentName: env('AGENT_NAME', 'Assistente Virtual'),
     authDir: 'auth_info_baileys',
   },
@@ -22,6 +23,7 @@ export const config = {
     confidenceThreshold: parseFloat(env('CONFIDENCE_THRESHOLD', '0.7')),
     maxHistoryLength: parseInt(env('MAX_HISTORY_LENGTH', '20')),
     escalationTimeoutMs: parseInt(env('ESCALATION_TIMEOUT_MS', '3600000')),
+    summarizeAfterMessages: parseInt(env('SUMMARIZE_AFTER_MESSAGES', '15')),
   },
   paths: {
     companyContext: 'data/company-context',

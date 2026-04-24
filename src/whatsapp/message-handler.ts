@@ -2,6 +2,7 @@ import { proto } from '@whiskeysockets/baileys';
 import { config } from '../config';
 import { processClientMessage, recordEscalationGroupMessage } from '../agent/agent';
 import { processManagerAnswer } from '../agent/escalation';
+import { handleTrainingMessage } from './training-handler';
 import { sendText } from './client';
 
 function extractText(msg: proto.IWebMessageInfo): string | null {
@@ -30,6 +31,12 @@ export async function handleMessage(msg: proto.IWebMessageInfo): Promise<void> {
 
   const text = extractText(msg)?.trim();
   if (!text) return;
+
+  // ── Training group: teach new skills ──────────────────────────────────
+  if (config.whatsapp.trainingGroupId && jid === config.whatsapp.trainingGroupId) {
+    await handleTrainingMessage(msg);
+    return;
+  }
 
   const isManagersGroup = config.whatsapp.managersGroupId
     ? jid === config.whatsapp.managersGroupId

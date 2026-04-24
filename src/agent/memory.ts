@@ -50,6 +50,25 @@ function initSchema(database: Database.Database): void {
       created_at INTEGER NOT NULL,
       resolved_at INTEGER
     );
+
+    CREATE TABLE IF NOT EXISTS skills (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT NOT NULL,
+      content TEXT NOT NULL,
+      examples TEXT NOT NULL DEFAULT '[]',
+      active INTEGER NOT NULL DEFAULT 1,
+      usage_count INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS conversation_summaries (
+      contact_jid TEXT PRIMARY KEY,
+      summary TEXT NOT NULL,
+      messages_summarized INTEGER NOT NULL DEFAULT 0,
+      updated_at INTEGER NOT NULL
+    );
   `);
 }
 
@@ -60,7 +79,7 @@ export interface ConversationRow {
   content: string;
 }
 
-export function getConversationHistory(contactJid: string): ConversationRow[] {
+export function getConversationHistory(contactJid: string, limit?: number): ConversationRow[] {
   const rows = getDb()
     .prepare(
       `SELECT role, content FROM conversations
@@ -68,8 +87,15 @@ export function getConversationHistory(contactJid: string): ConversationRow[] {
        ORDER BY timestamp DESC
        LIMIT ?`
     )
-    .all(contactJid, config.agent.maxHistoryLength) as ConversationRow[];
+    .all(contactJid, limit ?? config.agent.maxHistoryLength) as ConversationRow[];
   return rows.reverse();
+}
+
+export function getConversationMessageCount(contactJid: string): number {
+  const row = getDb()
+    .prepare('SELECT COUNT(*) AS cnt FROM conversations WHERE contact_jid = ?')
+    .get(contactJid) as { cnt: number };
+  return row.cnt;
 }
 
 export function saveMessage(
@@ -166,4 +192,95 @@ export function resolveEscalation(escalationId: string, managerResponse: string)
        WHERE id = ?`
     )
     .run(managerResponse, Date.now(), escalationId);
+}
+
+// ── Skills ───────────────────────────────────────────────────────────────────
+
+export interface SkillRow {
+  id: string;
+  name: string;
+  description: string;
+  content: string;
+  examples: string; // JSON string
+  usage_count: number;
+}
+
+export function saveSkill(skill: {
+  id: string;
+  name: string;
+  description: string;
+  content: string;
+  examples: string[];
+}): void {
+  const now = Date.now();
+  getDb()
+    .prepare(
+      `INSERT INTO skills (id, name, description, content, examples, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         name = excluded.name,
+         description = excluded.description,
+         content = excluded.content,
+         examples = excluded.examples,
+         updated_at = excluded.updated_at`
+    )
+    .run(skill.id, skill.name, skill.description, skill.content, JSON.stringify(skill.examples), now, now);
+}
+
+export function getAllSkills(): SkillRow[] {
+  return getDb()
+    .prepare(
+      `SELECT id, name, description, content, examples, usage_count
+       FROM skills WHERE active = 1
+       ORDER BY usage_count DESC, updated_at DESC`
+    )
+    .all() as SkillRow[];
+}
+
+export function deleteSkill(nameOrId: string): boolean {
+  const result = getDb()
+    .prepare(
+      `UPDATE skills SET active = 0
+       WHERE active = 1 AND (id = ? OR name LIKE ?)`
+    )
+    .run(nameOrId, `%${nameOrId}%`);
+  return result.changes > 0;
+}
+
+export function incrementSkillUsage(skillId: string): void {
+  getDb()
+    .prepare('UPDATE skills SET usage_count = usage_count + 1 WHERE id = ?')
+    .run(skillId);
+}
+
+// ── Conversation summaries ────────────────────────────────────────────────────
+
+export interface SummaryRow {
+  summary: string;
+  messages_summarized: number;
+}
+
+export function getConversationSummary(contactJid: string): SummaryRow | undefined {
+  return getDb()
+    .prepare(
+      'SELECT summary, messages_summarized FROM conversation_summaries WHERE contact_jid = ?'
+    )
+    .get(contactJid) as SummaryRow | undefined;
+}
+
+export function saveConversationSummary(
+  contactJid: string,
+  summary: string,
+  messagesSummarized: number
+): void {
+  getDb()
+    .prepare(
+      `INSERT INTO conversation_summaries (contact_jid, summary, messages_summarized, updated_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(contact_jid) DO UPDATE SET
+         summary = excluded.summary,
+         messages_summarized = excluded.messages_summarized,
+         updated_at = excluded.updated_at`
+    )
+    .run(contactJid, summary, messagesSummarized, Date.now());
 }
